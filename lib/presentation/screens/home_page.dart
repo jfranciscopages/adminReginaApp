@@ -24,13 +24,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Panel de Administración'),
+        title: const Text('Admin Regina App'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Productos'),
-            Tab(text: 'Servicios'),
-          ],
+          tabs: const [Tab(text: 'Productos'), Tab(text: 'Servicios')],
         ),
       ),
       body: TabBarView(
@@ -48,22 +45,56 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       return const Center(child: Text('No hay productos aún.'));
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Nombre')),
-          DataColumn(label: Text('Descripción')),
-          DataColumn(label: Text('Precio')),
-        ],
-        rows: products.map((product) {
-          return DataRow(cells: [
-            DataCell(Text(product.name)),
-            DataCell(Text(product.description)),
-            DataCell(Text(product.price.toString())),
-          ]);
-        }).toList(),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columnSpacing: 24,
+                  dataRowMinHeight: 48,
+                  dataRowMaxHeight: 56,
+                  columns: const [
+                    DataColumn(
+                      label: Text(
+                        'Nombre',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Descripción',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Precio',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+
+                  rows:
+                      products.map((product) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(product.name)),
+                            DataCell(Text(product.description)),
+                            DataCell(Text('\$${product.price}')),
+                          ],
+                        );
+                      }).toList(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

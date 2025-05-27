@@ -18,7 +18,24 @@ void main() async {
           initialData: const [],
         ),
       ],
-      child: const MaterialApp(home: HomePage()),
+      child: const AdminReginaApp(),
     ),
   );
+}
+
+class AdminReginaApp extends StatelessWidget {
+  const AdminReginaApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Admin Regina',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.teal,
+      ),
+      home: const HomePage(),
+    );
+  }
 }
