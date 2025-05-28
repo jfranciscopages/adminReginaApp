@@ -1,20 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class AddProductScreen extends StatefulWidget {
+class AddServiceScreen extends StatefulWidget {
   final VoidCallback onCancel;
 
-  const AddProductScreen({super.key, required this.onCancel});
+  const AddServiceScreen({super.key, required this.onCancel});
 
   @override
-  State<AddProductScreen> createState() => _AddProductScreenState();
+  State<AddServiceScreen> createState() => _AddServiceScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
+class _AddServiceScreenState extends State<AddServiceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _timesController = TextEditingController();
   final _imageUrlController = TextEditingController();
 
   bool _isSubmitting = false;
@@ -26,10 +27,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     try {
       final docRef = await FirebaseFirestore.instance
-          .collection('products')
+          .collection('services')
           .add({
             'name': _nameController.text.trim(),
             'description': _descriptionController.text.trim(),
+            'times': _timesController.text.trim(),
             'price': int.parse(_priceController.text.trim()),
             'imageUrl': _imageUrlController.text.trim(),
             'createdAt': FieldValue.serverTimestamp(),
@@ -41,7 +43,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Producto agregado correctamente'),
+          content: Text('Servicio agregado correctamente'),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -89,7 +91,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     children: [
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Nombre del producto'),
+                        decoration: const InputDecoration(labelText: 'Nombre del servicio'),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
@@ -108,8 +110,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
                       TextFormField(
+                        controller: _timesController,
+                        decoration: const InputDecoration(labelText: 'Duración del servicio'),
+                        validator:
+                            (val) =>
+                                val == null || val.isEmpty ? 'Requerido' : null,
+                      ),
+                      TextFormField(
                         controller: _priceController,
-                        decoration: const InputDecoration(labelText: 'Precio del producto'),
+                        decoration: const InputDecoration(labelText: 'Precio del servicio'),
                         keyboardType: TextInputType.number,
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Requerido';
