@@ -1,4 +1,6 @@
+import 'package:admin_regina_app/domain/service.dart';
 import 'package:admin_regina_app/presentation/providers/product_provider.dart';
+import 'package:admin_regina_app/presentation/providers/service_provider.dart';
 import 'package:admin_regina_app/presentation/screens/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +19,10 @@ void main() async {
           create: (_) => ProductProvider().getProductsStream(),
           initialData: const [],
         ),
+        StreamProvider<List<Service>>(
+          create: (_) => ServiceProvider().getServicesStream(),
+          initialData: const [],
+        ),
       ],
       child: const AdminReginaApp(),
     ),
@@ -31,10 +37,7 @@ class AdminReginaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Admin Regina',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
       home: const HomePage(),
     );
   }
