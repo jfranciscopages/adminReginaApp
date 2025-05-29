@@ -1,10 +1,18 @@
+import 'package:admin_regina_app/domain/product.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback onCancel;
+  final Product? productToEdit;
+  final bool isEditing;
 
-  const AddProductScreen({super.key, required this.onCancel});
+  const AddProductScreen({
+    super.key,
+    this.productToEdit,
+    this.isEditing = false,
+    required this.onCancel,
+  });
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -19,34 +27,70 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   bool _isSubmitting = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isEditing && widget.productToEdit != null) {
+      final p = widget.productToEdit!;
+      _nameController.text = p.name;
+      _descriptionController.text = p.description;
+      _priceController.text = p.price.toString();
+      _imageUrlController.text = p.imageUrl ?? '';
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
     try {
-      final docRef = await FirebaseFirestore.instance
-          .collection('products')
-          .add({
-            'name': _nameController.text.trim(),
-            'description': _descriptionController.text.trim(),
-            'price': int.parse(_priceController.text.trim()),
-            'imageUrl': _imageUrlController.text.trim(),
-            'createdAt': FieldValue.serverTimestamp(),
-            'deletedAt': null,
-            'status': 'active',
-          });
+      if (widget.isEditing && widget.productToEdit != null) {
+        await FirebaseFirestore.instance
+            .collection('products')
+            .doc(widget.productToEdit!.id)
+            .update({
+              'name': _nameController.text.trim(),
+              'description': _descriptionController.text.trim(),
+              'price': int.parse(_priceController.text.trim()),
+              'imageUrl': _imageUrlController.text.trim(),
+              'status': 'active',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
 
-      await docRef.update({'id': docRef.id});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Producto actualizado correctamente'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        // Crea producto nuevo
+        final docRef = await FirebaseFirestore.instance
+            .collection('products')
+            .add({
+              'name': _nameController.text.trim(),
+              'description': _descriptionController.text.trim(),
+              'price': int.parse(_priceController.text.trim()),
+              'imageUrl': _imageUrlController.text.trim(),
+              'createdAt': FieldValue.serverTimestamp(),
+              'deletedAt': null,
+              'status': 'active',
+            });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Producto agregado correctamente'),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        await docRef.update({'id': docRef.id});
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Producto agregado correctamente'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
 
       widget.onCancel();
     } catch (e) {
@@ -87,9 +131,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: ListView(
                     shrinkWrap: true,
                     children: [
+                      Text(
+                        widget.isEditing
+                            ? 'Editar producto'
+                            : 'Agregar nuevo producto',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Nombre del producto'),
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre del producto',
+                        ),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
@@ -109,7 +163,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                       TextFormField(
                         controller: _priceController,
-                        decoration: const InputDecoration(labelText: 'Precio del producto'),
+                        decoration: const InputDecoration(
+                          labelText: 'Precio del producto',
+                        ),
                         keyboardType: TextInputType.number,
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Requerido';
@@ -135,7 +191,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           const SizedBox(width: 12),
                           ElevatedButton(
                             onPressed: _isSubmitting ? null : _submit,
-                            child: const Text('Guardar'),
+                            child: Text(
+                              widget.isEditing ? 'Actualizar' : 'Guardar',
+                            ),
                           ),
                         ],
                       ),

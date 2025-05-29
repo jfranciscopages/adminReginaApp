@@ -7,6 +7,7 @@ class ProductProvider {
   Stream<List<Product>> getProductsStream() {
     return FirebaseFirestore.instance
         .collection('products')
+        .where('status', isEqualTo: 'active')
         .withConverter<Product>(
           fromFirestore: Product.fromFirestore,
           toFirestore: (product, _) => product.toFirestore(),
