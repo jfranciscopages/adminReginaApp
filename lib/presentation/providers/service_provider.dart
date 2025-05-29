@@ -5,9 +5,15 @@ class ServiceProvider {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Stream<List<Service>> getServicesStream() {
-    return _firestore.collection('services').snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Service.fromFirestore(doc, null)).toList();
-    });
+    return _firestore
+        .collection('services')
+        .where('status', isEqualTo: 'active')
+        .withConverter<Service>(
+          fromFirestore: Service.fromFirestore,
+          toFirestore: (service, _) => service.toFirestore(),
+        )
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
   }
 
   Future<void> addService(Service service) {

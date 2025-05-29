@@ -2,6 +2,7 @@ import 'package:admin_regina_app/domain/product.dart';
 import 'package:admin_regina_app/domain/service.dart';
 import 'package:admin_regina_app/presentation/screens/add_product_screen.dart';
 import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,6 +17,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late TabController _tabController;
   bool _showAddProductForm = false;
   bool _showAddServiceForm = false;
+  Service? _serviceToEdit;
+  Product? _productToEdit;
+  bool _isEditingProduct = false;
 
   @override
   void initState() {
@@ -49,7 +53,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildProductSection(List<Product> products) {
     if (_showAddProductForm) {
       return AddProductScreen(
-        onCancel: () => setState(() => _showAddProductForm = false),
+        onCancel: () {
+          setState(() {
+            _showAddProductForm = false;
+            _isEditingProduct = false;
+            _productToEdit = null;
+          });
+        },
+        isEditing: _isEditingProduct,
+        productToEdit: _productToEdit,
       );
     }
 
@@ -105,6 +117,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
+                          DataColumn(label: Text('')),
                         ],
                         rows:
                             products.map((product) {
@@ -113,6 +126,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                   DataCell(Text(product.name)),
                                   DataCell(Text(product.description)),
                                   DataCell(Text('\$${product.price}')),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _showAddProductForm = true;
+                                              _productToEdit = product;
+                                              _isEditingProduct = true;
+                                            });
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                          ),
+                                          onPressed:
+                                              () => _confirmDeleteProduct(
+                                                product,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               );
                             }).toList(),
@@ -128,10 +176,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  void _confirmDeleteProduct(Product product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmar eliminación'),
+            content: Text('¿Seguro que querés eliminar "${product.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  'Eliminar',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await FirebaseFirestore.instance
+          .collection('products')
+          .doc(product.id)
+          .update({'status': 'inactive', 'deletedAt': Timestamp.now()});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Producto eliminado correctamente.'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildServiceSection(List<Service> services) {
     if (_showAddServiceForm) {
       return AddServiceScreen(
-        onCancel: () => setState(() => _showAddServiceForm = false),
+        serviceToEdit: _serviceToEdit,
+        isEditing: _serviceToEdit != null,
+        onCancel:
+            () => setState(() {
+              _showAddServiceForm = false;
+              _serviceToEdit = null;
+            }),
       );
     }
 
@@ -143,7 +239,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           child: Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
-              onPressed: () => setState(() => _showAddServiceForm = true),
+              onPressed:
+                  () => setState(() {
+                    _serviceToEdit = null;
+                    _showAddServiceForm = true;
+                  }),
               icon: const Icon(Icons.add),
               label: const Text("Agregar servicio"),
             ),
@@ -193,6 +293,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
+                          DataColumn(label: Text('')),
                         ],
                         rows:
                             services.map((service) {
@@ -202,6 +303,39 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                   DataCell(Text(service.description)),
                                   DataCell(Text(service.times)),
                                   DataCell(Text('\$${service.price}')),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary,
+                                          ),
+                                          onPressed:
+                                              () => setState(() {
+                                                _serviceToEdit = service;
+                                                _showAddServiceForm = true;
+                                              }),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                          ),
+                                          onPressed:
+                                              () => _confirmDeleteService(
+                                                service,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               );
                             }).toList(),
@@ -215,5 +349,47 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       ],
     );
+  }
+
+  void _confirmDeleteService(Service service) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirmar eliminación'),
+            content: Text('¿Seguro que querés eliminar "${service.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  'Eliminar',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await FirebaseFirestore.instance
+          .collection('services')
+          .doc(service.id)
+          .update({'status': 'inactive', 'deletedAt': Timestamp.now()});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Servicio eliminado correctamente.'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
+        );
+      }
+    }
   }
 }

@@ -1,10 +1,18 @@
+import 'package:admin_regina_app/domain/service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class AddServiceScreen extends StatefulWidget {
   final VoidCallback onCancel;
+  final Service? serviceToEdit;
+  final bool isEditing;
 
-  const AddServiceScreen({super.key, required this.onCancel});
+  const AddServiceScreen({
+    super.key,
+    this.serviceToEdit,
+    this.isEditing = false,
+    required this.onCancel,
+  });
 
   @override
   State<AddServiceScreen> createState() => _AddServiceScreenState();
@@ -20,35 +28,70 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
 
   bool _isSubmitting = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isEditing && widget.serviceToEdit != null) {
+      final s = widget.serviceToEdit!;
+      _nameController.text = s.name;
+      _descriptionController.text = s.description;
+      _timesController.text = s.times;
+      _priceController.text = s.price.toString();
+      _imageUrlController.text = s.imageUrl ?? '';
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
 
     try {
-      final docRef = await FirebaseFirestore.instance
-          .collection('services')
-          .add({
-            'name': _nameController.text.trim(),
-            'description': _descriptionController.text.trim(),
-            'times': _timesController.text.trim(),
-            'price': int.parse(_priceController.text.trim()),
-            'imageUrl': _imageUrlController.text.trim(),
-            'createdAt': FieldValue.serverTimestamp(),
-            'deletedAt': null,
-            'status': 'active',
-          });
+      if (widget.isEditing && widget.serviceToEdit != null) {
+        await FirebaseFirestore.instance
+            .collection('services')
+            .doc(widget.serviceToEdit!.id)
+            .update({
+              'name': _nameController.text.trim(),
+              'description': _descriptionController.text.trim(),
+              'times': _timesController.text.trim(),
+              'price': int.parse(_priceController.text.trim()),
+              'imageUrl': _imageUrlController.text.trim(),
+              'status': 'active',
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
 
-      await docRef.update({'id': docRef.id});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Servicio actualizado correctamente'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        final docRef = await FirebaseFirestore.instance
+            .collection('services')
+            .add({
+              'name': _nameController.text.trim(),
+              'description': _descriptionController.text.trim(),
+              'times': _timesController.text.trim(),
+              'price': int.parse(_priceController.text.trim()),
+              'imageUrl': _imageUrlController.text.trim(),
+              'createdAt': FieldValue.serverTimestamp(),
+              'deletedAt': null,
+              'status': 'active',
+            });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Servicio agregado correctamente'),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        await docRef.update({'id': docRef.id});
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Servicio agregado correctamente'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
 
       widget.onCancel();
     } catch (e) {
@@ -89,9 +132,19 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                   child: ListView(
                     shrinkWrap: true,
                     children: [
+                      Text(
+                        widget.isEditing
+                            ? 'Editar servicio'
+                            : 'Agregar nuevo servicio',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Nombre del servicio'),
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre del servicio',
+                        ),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
@@ -111,14 +164,18 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                       ),
                       TextFormField(
                         controller: _timesController,
-                        decoration: const InputDecoration(labelText: 'Duración del servicio'),
+                        decoration: const InputDecoration(
+                          labelText: 'Duración del servicio',
+                        ),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
                       TextFormField(
                         controller: _priceController,
-                        decoration: const InputDecoration(labelText: 'Precio del servicio'),
+                        decoration: const InputDecoration(
+                          labelText: 'Precio del servicio',
+                        ),
                         keyboardType: TextInputType.number,
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Requerido';
