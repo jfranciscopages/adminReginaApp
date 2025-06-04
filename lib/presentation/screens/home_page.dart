@@ -17,9 +17,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late TabController _tabController;
   bool _showAddProductForm = false;
   bool _showAddServiceForm = false;
-  Service? _serviceToEdit;
   Product? _productToEdit;
   bool _isEditingProduct = false;
+  bool _isEditingService = false;
+  Map<String, dynamic>? _serviceToEdit;
 
   @override
   void initState() {
@@ -219,15 +220,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildServiceSection(List<Service> services) {
-    if (_showAddServiceForm) {
+    if (_showAddServiceForm || _isEditingService) {
       return AddServiceScreen(
-        serviceToEdit: _serviceToEdit,
-        isEditing: _serviceToEdit != null,
         onCancel:
             () => setState(() {
               _showAddServiceForm = false;
+              _isEditingService = false;
               _serviceToEdit = null;
             }),
+        isEditing: _isEditingService,
+        serviceToEdit: _serviceToEdit,
       );
     }
 
@@ -314,11 +316,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                                   context,
                                                 ).colorScheme.secondary,
                                           ),
-                                          onPressed:
-                                              () => setState(() {
-                                                _serviceToEdit = service;
-                                                _showAddServiceForm = true;
-                                              }),
+                                          onPressed: () {
+                                            setState(() {
+                                              _isEditingService = true;
+                                              _serviceToEdit = {
+                                                'id': service.id,
+                                                'name': service.name,
+                                                'description':
+                                                    service.description,
+                                                'price': service.price,
+                                                'imageUrl': service.imageUrl,
+                                                'duration': service.duration,
+                                                'times': service.times,
+                                              };
+                                            });
+                                          },
                                         ),
                                         IconButton(
                                           icon: Icon(
