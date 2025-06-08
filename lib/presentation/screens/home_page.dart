@@ -1,5 +1,7 @@
+import 'package:admin_regina_app/domain/order.dart';
 import 'package:admin_regina_app/domain/product.dart';
 import 'package:admin_regina_app/domain/service.dart';
+import 'package:admin_regina_app/presentation/providers/purchase_order_provider.dart';
 import 'package:admin_regina_app/presentation/screens/add_product_screen.dart';
 import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,11 +23,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _isEditingProduct = false;
   bool _isEditingService = false;
   Map<String, dynamic>? _serviceToEdit;
+  int _currentPage = 0;
+  final int _rowsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -38,7 +42,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         title: const Text('Admin Regina App'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [Tab(text: 'Productos'), Tab(text: 'Servicios')],
+          tabs: const [
+            Tab(text: 'Productos'),
+            Tab(text: 'Servicios'),
+            Tab(text: 'Mis ventas'),
+          ],
         ),
       ),
       body: TabBarView(
@@ -46,6 +54,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         children: [
           _buildProductSection(products),
           _buildServiceSection(services),
+          _buildSalesSection(),
         ],
       ),
     );
@@ -403,5 +412,200 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         );
       }
     }
+  }
+
+  Widget _buildSalesSection() {
+    final provider = PurchaseOrderProvider();
+
+    return StreamBuilder<List<PurchaseOrder>>(
+      stream: provider.getOrdersStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No hay ventas registradas.'));
+        }
+
+        final orders = snapshot.data!;
+        final paginatedOrders =
+            orders
+                .skip(_currentPage * _rowsPerPage)
+                .take(_rowsPerPage)
+                .toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 60),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 1000),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columnSpacing: 24,
+                              dataRowMinHeight: 56,
+                              dataRowMaxHeight: 72,
+                              columns: const [
+                                DataColumn(
+                                  label: Text(
+                                    'ID Orden',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Estado',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Total',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Fecha',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Detalle',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              rows:
+                                  paginatedOrders.map((order) {
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(Text(order.id)),
+                                        DataCell(Text(order.status)),
+                                        DataCell(
+                                          Text(
+                                            '\$${order.totalPrice.toStringAsFixed(2)}',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            '${order.createdAt.day.toString().padLeft(2, '0')}/${order.createdAt.month.toString().padLeft(2, '0')}/${order.createdAt.year}',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.info_outline,
+                                            ),
+                                            onPressed: () {
+                                              _showOrderDetailsDialog(order);
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed:
+                        _currentPage > 0
+                            ? () => setState(() => _currentPage--)
+                            : null,
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                  Text('Página ${_currentPage + 1}'),
+                  IconButton(
+                    onPressed:
+                        (_currentPage + 1) * _rowsPerPage < orders.length
+                            ? () => setState(() => _currentPage++)
+                            : null,
+                    icon: const Icon(Icons.arrow_forward),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showOrderDetailsDialog(PurchaseOrder order) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Detalle de Orden ${order.id}'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: order.items.length,
+                itemBuilder: (context, index) {
+                  final item = order.items[index];
+                  return ListTile(
+                    leading:
+                        item.product.imageUrl != null
+                            ? Image.network(
+                              item.product.imageUrl!,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                            )
+                            : const Icon(Icons.image_not_supported),
+                    title: Text(item.product.name),
+                    subtitle: Text('Cantidad: ${item.quantity}'),
+                    trailing: Text(
+                      '\$${item.product.price.toStringAsFixed(2)}',
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+    );
   }
 }
