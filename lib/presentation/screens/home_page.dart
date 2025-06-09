@@ -1,21 +1,25 @@
 import 'package:admin_regina_app/domain/order.dart';
 import 'package:admin_regina_app/domain/product.dart';
 import 'package:admin_regina_app/domain/service.dart';
+import 'package:admin_regina_app/presentation/providers/product_provider.dart';
+import 'package:admin_regina_app/presentation/providers/product_storage_provider.dart';
 import 'package:admin_regina_app/presentation/providers/purchase_order_provider.dart';
+import 'package:admin_regina_app/presentation/providers/service_provider.dart';
 import 'package:admin_regina_app/presentation/screens/add_product_screen.dart';
 import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // ✅
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends ConsumerState<HomePage>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   bool _showAddProductForm = false;
   bool _showAddServiceForm = false;
@@ -34,8 +38,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final products = context.watch<List<Product>>();
-    final services = context.watch<List<Service>>();
+    final products = ref.watch(productProvider);
+    final services = ref.watch(serviceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -52,8 +56,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildProductSection(products),
-          _buildServiceSection(services),
+          products.when(
+            data: (products) => _buildProductSection(products),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
+          services.when(
+            data: (services) => _buildServiceSection(services),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
           _buildSalesSection(),
         ],
       ),
@@ -99,7 +111,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               return SingleChildScrollView(
                 scrollDirection: Axis.vertical,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                    maxWidth: 1000,
+                  ),
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: SingleChildScrollView(
@@ -111,7 +126,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         columns: const [
                           DataColumn(
                             label: Text(
-                              'Nombre',
+                              'Producto',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -133,8 +148,74 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             products.map((product) {
                               return DataRow(
                                 cells: [
-                                  DataCell(Text(product.name)),
-                                  DataCell(Text(product.description)),
+                                  DataCell(
+                                    FutureBuilder<String>(
+                                      future: ref
+                                          .read(productStorageServiceProvider)
+                                          .getProductImageUrl(product),
+                                      builder: (context, snapshot) {
+                                        Widget imageWidget;
+
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          imageWidget = const SizedBox(
+                                            width: 40,
+                                            height: 40,
+                                          ); // o shimmer si querés
+                                        } else if (snapshot.hasError ||
+                                            !snapshot.hasData) {
+                                          imageWidget = const Icon(
+                                            Icons.broken_image,
+                                            size: 40,
+                                          );
+                                        } else {
+                                          imageWidget = Image.network(
+                                            snapshot.data!,
+                                            width: 40,
+                                            height: 40,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    const Icon(
+                                                      Icons.broken_image,
+                                                      size: 40,
+                                                    ),
+                                          );
+                                        }
+
+                                        return Row(
+                                          children: [
+                                            imageWidget,
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 180,
+                                              ),
+                                              child: Text(
+                                                product.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+
+                                  DataCell(
+                                    Container(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 400,
+                                      ),
+                                      child: Text(
+                                        product.description,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                  ),
+
                                   DataCell(Text('\$${product.price}')),
                                   DataCell(
                                     Row(
