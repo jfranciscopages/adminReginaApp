@@ -1,4 +1,5 @@
 import 'package:admin_regina_app/domain/service.dart';
+import 'package:admin_regina_app/presentation/widgets/image_uploader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -9,9 +10,9 @@ class AddServiceScreen extends StatefulWidget {
 
   const AddServiceScreen({
     super.key,
+    required this.onCancel,
     this.serviceToEdit,
     this.isEditing = false,
-    required this.onCancel,
   });
 
   @override
@@ -23,10 +24,11 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _timesController = TextEditingController();
+  final _durationController = TextEditingController();
   final _imageUrlController = TextEditingController();
 
   bool _isSubmitting = false;
+  String? _imagePath;
 
   @override
   void initState() {
@@ -35,10 +37,29 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
       final s = widget.serviceToEdit!;
       _nameController.text = s.name;
       _descriptionController.text = s.description;
-      _timesController.text = s.times;
       _priceController.text = s.price.toString();
+      _durationController.text = s.duration.toString();
       _imageUrlController.text = s.imageUrl ?? '';
+      _imagePath = s.imagePath;
     }
+  }
+
+  String generateTimesLabel(int durationInMinutes) {
+    if (durationInMinutes > 120) {
+      throw ArgumentError('La duración no puede superar los 120 minutos.');
+    }
+
+    if (durationInMinutes < 60) {
+      return '$durationInMinutes minutos';
+    }
+
+    final hours = durationInMinutes ~/ 60;
+    final minutes = durationInMinutes % 60;
+
+    final hourLabel = hours == 1 ? '1 hora' : '$hours horas';
+    final minuteLabel = minutes > 0 ? ' $minutes minutos' : '';
+
+    return hourLabel + minuteLabel;
   }
 
   Future<void> _submit() async {
@@ -47,41 +68,39 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     setState(() => _isSubmitting = true);
 
     try {
+      final durationMinutes = int.parse(_durationController.text.trim());
+      final serviceData = {
+        'name': _nameController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'price': int.parse(_priceController.text.trim()),
+        'duration': durationMinutes,
+        'times': generateTimesLabel(durationMinutes),
+        'imageUrl': _imageUrlController.text.trim(),
+        'imagePath': _imagePath,
+        'status': 'active',
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
       if (widget.isEditing && widget.serviceToEdit != null) {
         await FirebaseFirestore.instance
             .collection('services')
             .doc(widget.serviceToEdit!.id)
-            .update({
-              'name': _nameController.text.trim(),
-              'description': _descriptionController.text.trim(),
-              'times': _timesController.text.trim(),
-              'price': int.parse(_priceController.text.trim()),
-              'imageUrl': _imageUrlController.text.trim(),
-              'status': 'active',
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+            .update(serviceData);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Servicio actualizado correctamente'),
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
         );
       } else {
+        serviceData['createdAt'] = FieldValue.serverTimestamp();
+
         final docRef = await FirebaseFirestore.instance
             .collection('services')
-            .add({
-              'name': _nameController.text.trim(),
-              'description': _descriptionController.text.trim(),
-              'times': _timesController.text.trim(),
-              'price': int.parse(_priceController.text.trim()),
-              'imageUrl': _imageUrlController.text.trim(),
-              'createdAt': FieldValue.serverTimestamp(),
-              'deletedAt': null,
-              'status': 'active',
-            });
-
+            .add(serviceData);
         await docRef.update({'id': docRef.id});
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +108,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
             content: const Text('Servicio agregado correctamente'),
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -152,7 +172,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                       TextFormField(
                         controller: _descriptionController,
                         decoration: const InputDecoration(
-                          labelText: 'Descripción del producto',
+                          labelText: 'Descripción del servicio',
                           alignLabelWithHint: true,
                         ),
                         maxLines: null,
@@ -163,13 +183,19 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
                       TextFormField(
-                        controller: _timesController,
+                        controller: _durationController,
                         decoration: const InputDecoration(
-                          labelText: 'Duración del servicio',
+                          labelText: 'Duración (en minutos)',
                         ),
-                        validator:
-                            (val) =>
-                                val == null || val.isEmpty ? 'Requerido' : null,
+                        keyboardType: TextInputType.number,
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Requerido';
+                          final parsed = int.tryParse(val);
+                          if (parsed == null || parsed <= 0) {
+                            return 'Debe ser un número positivo';
+                          }
+                          return null;
+                        },
                       ),
                       TextFormField(
                         controller: _priceController,
@@ -184,12 +210,19 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           return null;
                         },
                       ),
-                      TextFormField(
-                        controller: _imageUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'URL de imagen',
-                        ),
+                      ImageUploader(
+                        itemId:
+                            widget.serviceToEdit?.id ??
+                            DateTime.now().millisecondsSinceEpoch.toString(),
+                        initialImagePath: widget.serviceToEdit?.imagePath,
+                        folderName: 'services',
+                        onImageUploaded: (path) {
+                          setState(() {
+                            _imagePath = path;
+                          });
+                        },
                       ),
+
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -201,7 +234,9 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           const SizedBox(width: 12),
                           ElevatedButton(
                             onPressed: _isSubmitting ? null : _submit,
-                            child: const Text('Guardar'),
+                            child: Text(
+                              widget.isEditing ? 'Actualizar' : 'Guardar',
+                            ),
                           ),
                         ],
                       ),

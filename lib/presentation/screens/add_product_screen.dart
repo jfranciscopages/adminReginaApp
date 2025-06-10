@@ -1,4 +1,5 @@
 import 'package:admin_regina_app/domain/product.dart';
+import 'package:admin_regina_app/presentation/widgets/image_uploader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -23,9 +24,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _imageUrlController = TextEditingController();
 
   bool _isSubmitting = false;
+  String? _imagePath;
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _nameController.text = p.name;
       _descriptionController.text = p.description;
       _priceController.text = p.price.toString();
-      _imageUrlController.text = p.imageUrl ?? '';
+      _imagePath = p.imagePath;
     }
   }
 
@@ -53,7 +54,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               'name': _nameController.text.trim(),
               'description': _descriptionController.text.trim(),
               'price': int.parse(_priceController.text.trim()),
-              'imageUrl': _imageUrlController.text.trim(),
+              'imagePath': _imagePath,
               'status': 'active',
               'updatedAt': FieldValue.serverTimestamp(),
             });
@@ -74,7 +75,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               'name': _nameController.text.trim(),
               'description': _descriptionController.text.trim(),
               'price': int.parse(_priceController.text.trim()),
-              'imageUrl': _imageUrlController.text.trim(),
+              'imagePath': _imagePath,
               'createdAt': FieldValue.serverTimestamp(),
               'deletedAt': null,
               'status': 'active',
@@ -174,11 +175,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
-                      TextFormField(
-                        controller: _imageUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'URL de imagen',
-                        ),
+                      ImageUploader(
+                        itemId:
+                            widget.productToEdit?.id ??
+                            DateTime.now().millisecondsSinceEpoch.toString(),
+                        initialImagePath: widget.productToEdit?.imagePath,
+                        folderName: 'products',
+                        onImageUploaded: (path) {
+                          setState(() {
+                            _imagePath = path;
+                          });
+                        },
                       ),
                       const SizedBox(height: 24),
                       Row(
