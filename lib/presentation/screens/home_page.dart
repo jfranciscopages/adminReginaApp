@@ -205,7 +205,6 @@ class _HomePageState extends ConsumerState<HomePage>
                                       },
                                     ),
                                   ),
-
                                   DataCell(
                                     Container(
                                       constraints: const BoxConstraints(
@@ -218,7 +217,6 @@ class _HomePageState extends ConsumerState<HomePage>
                                       ),
                                     ),
                                   ),
-
                                   DataCell(Text('\$${product.price}')),
                                   DataCell(
                                     Row(
@@ -452,8 +450,18 @@ class _HomePageState extends ConsumerState<HomePage>
                                       },
                                     ),
                                   ),
-
-                                  DataCell(Text(service.description)),
+                                  DataCell(
+                                    Container(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 400,
+                                      ),
+                                      child: Text(
+                                        service.description,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                  ),
                                   DataCell(Text(service.times)),
                                   DataCell(Text('\$${service.price}')),
                                   DataCell(
@@ -562,6 +570,7 @@ class _HomePageState extends ConsumerState<HomePage>
         }
 
         final orders = snapshot.data!;
+        orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         final paginatedOrders =
             orders
                 .skip(_currentPage * _rowsPerPage)
