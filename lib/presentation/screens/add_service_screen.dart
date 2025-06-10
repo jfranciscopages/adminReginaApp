@@ -1,9 +1,11 @@
+import 'package:admin_regina_app/domain/service.dart';
+import 'package:admin_regina_app/presentation/widgets/image_uploader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class AddServiceScreen extends StatefulWidget {
   final VoidCallback onCancel;
-  final Map<String, dynamic>? serviceToEdit;
+  final Service? serviceToEdit;
   final bool isEditing;
 
   const AddServiceScreen({
@@ -26,17 +28,19 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   final _imageUrlController = TextEditingController();
 
   bool _isSubmitting = false;
+  String? _imagePath;
 
   @override
   void initState() {
     super.initState();
     if (widget.isEditing && widget.serviceToEdit != null) {
       final s = widget.serviceToEdit!;
-      _nameController.text = s['name'] ?? '';
-      _descriptionController.text = s['description'] ?? '';
-      _priceController.text = s['price'].toString();
-      _durationController.text = s['duration'].toString();
-      _imageUrlController.text = s['imageUrl'] ?? '';
+      _nameController.text = s.name;
+      _descriptionController.text = s.description;
+      _priceController.text = s.price.toString();
+      _durationController.text = s.duration.toString();
+      _imageUrlController.text = s.imageUrl ?? '';
+      _imagePath = s.imagePath;
     }
   }
 
@@ -72,6 +76,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
         'duration': durationMinutes,
         'times': generateTimesLabel(durationMinutes),
         'imageUrl': _imageUrlController.text.trim(),
+        'imagePath': _imagePath,
         'status': 'active',
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -79,7 +84,7 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
       if (widget.isEditing && widget.serviceToEdit != null) {
         await FirebaseFirestore.instance
             .collection('services')
-            .doc(widget.serviceToEdit!['id'])
+            .doc(widget.serviceToEdit!.id)
             .update(serviceData);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -205,12 +210,19 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           return null;
                         },
                       ),
-                      TextFormField(
-                        controller: _imageUrlController,
-                        decoration: const InputDecoration(
-                          labelText: 'URL de imagen',
-                        ),
+                      ImageUploader(
+                        itemId:
+                            widget.serviceToEdit?.id ??
+                            DateTime.now().millisecondsSinceEpoch.toString(),
+                        initialImagePath: widget.serviceToEdit?.imagePath,
+                        folderName: 'services',
+                        onImageUploaded: (path) {
+                          setState(() {
+                            _imagePath = path;
+                          });
+                        },
                       ),
+
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,

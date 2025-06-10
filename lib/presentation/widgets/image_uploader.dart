@@ -1,20 +1,21 @@
 import 'dart:typed_data';
 import 'dart:html' as html;
+import 'package:admin_regina_app/presentation/providers/storage_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:admin_regina_app/domain/product.dart';
-import 'package:admin_regina_app/presentation/providers/product_storage_provider.dart';
 
 class ImageUploader extends ConsumerStatefulWidget {
-  final String productId;
+  final String itemId; // Puede ser producto o servicio
   final Function(String imagePath) onImageUploaded;
   final String? initialImagePath;
+  final String folderName; // 'products' o 'services'
 
   const ImageUploader({
     super.key,
-    required this.productId,
+    required this.itemId,
     required this.onImageUploaded,
     this.initialImagePath,
+    required this.folderName,
   });
 
   @override
@@ -34,16 +35,10 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
   }
 
   Future<void> _loadImageFromPath(String path) async {
-    final storageService = ref.read(productStorageServiceProvider);
-    final url = await storageService.getProductImageUrl(
-      Product(
-        id: widget.productId,
-        name: '',
-        description: '',
-        price: 0,
-        imagePath: path,
-        status: 'active',
-      ),
+    final storage = ref.read(storageProvider);
+    final url = await storage.getImagePath(
+      folder: widget.folderName,
+      fileName: path,
     );
     setState(() {
       _imageUrlPreview = url;
@@ -62,26 +57,26 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
 
       reader.readAsArrayBuffer(file);
       reader.onLoadEnd.listen((e) async {
-        final storageService = ref.read(productStorageServiceProvider);
         final bytes = reader.result as Uint8List;
+        final storageService = ref.read(storageProvider);
 
         setState(() {
           _isUploading = true;
         });
 
-        final path = await storageService.uploadProductImage(bytes, file.name);
+        final fileName = file.name;
 
-        widget.onImageUploaded(file.name);
+        await storageService.uploadImage(
+          folder: widget.folderName,
+          bytes: bytes,
+          fileName: fileName,
+        );
 
-        final url = await storageService.getProductImageUrl(
-          Product(
-            id: widget.productId,
-            name: '',
-            description: '',
-            price: 0,
-            imagePath: file.name,
-            status: 'active',
-          ),
+        widget.onImageUploaded(fileName);
+
+        final url = await storageService.getImagePath(
+          folder: widget.folderName,
+          fileName: fileName,
         );
 
         setState(() {
@@ -106,9 +101,6 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
       );
     } else {
       imagePreviewBox = const Icon(Icons.image, size: 48, color: Colors.grey);
-
-      // Alternativa si querés dejar solo texto:
-      // imagePreviewBox = const Text('Imagen sin seleccionar');
     }
 
     return Column(

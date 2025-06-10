@@ -176,17 +176,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         },
                       ),
                       ImageUploader(
-                        productId:
+                        itemId:
                             widget.productToEdit?.id ??
                             DateTime.now().millisecondsSinceEpoch.toString(),
                         initialImagePath: widget.productToEdit?.imagePath,
+                        folderName: 'products',
                         onImageUploaded: (path) {
                           setState(() {
                             _imagePath = path;
                           });
                         },
                       ),
-
                       const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,

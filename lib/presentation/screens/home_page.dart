@@ -2,9 +2,9 @@ import 'package:admin_regina_app/domain/order.dart';
 import 'package:admin_regina_app/domain/product.dart';
 import 'package:admin_regina_app/domain/service.dart';
 import 'package:admin_regina_app/presentation/providers/product_provider.dart';
-import 'package:admin_regina_app/presentation/providers/product_storage_provider.dart';
 import 'package:admin_regina_app/presentation/providers/purchase_order_provider.dart';
 import 'package:admin_regina_app/presentation/providers/service_provider.dart';
+import 'package:admin_regina_app/presentation/providers/storage_provider.dart';
 import 'package:admin_regina_app/presentation/screens/add_product_screen.dart';
 import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,7 +26,7 @@ class _HomePageState extends ConsumerState<HomePage>
   Product? _productToEdit;
   bool _isEditingProduct = false;
   bool _isEditingService = false;
-  Map<String, dynamic>? _serviceToEdit;
+  Service? _serviceToEdit;
   int _currentPage = 0;
   final int _rowsPerPage = 10;
 
@@ -73,7 +73,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildProductSection(List<Product> products) {
-    if (_showAddProductForm) {
+    if (_showAddProductForm || _isEditingProduct) {
       return AddProductScreen(
         onCancel: () {
           setState(() {
@@ -151,8 +151,11 @@ class _HomePageState extends ConsumerState<HomePage>
                                   DataCell(
                                     FutureBuilder<String>(
                                       future: ref
-                                          .read(productStorageServiceProvider)
-                                          .getProductImageUrl(product),
+                                          .read(storageProvider)
+                                          .getImagePath(
+                                            folder: 'products',
+                                            fileName: product.imagePath ?? '',
+                                          ),
                                       builder: (context, snapshot) {
                                         Widget imageWidget;
 
@@ -312,12 +315,13 @@ class _HomePageState extends ConsumerState<HomePage>
   Widget _buildServiceSection(List<Service> services) {
     if (_showAddServiceForm || _isEditingService) {
       return AddServiceScreen(
-        onCancel:
-            () => setState(() {
-              _showAddServiceForm = false;
-              _isEditingService = false;
-              _serviceToEdit = null;
-            }),
+        onCancel: () {
+          setState(() {
+            _showAddServiceForm = false;
+            _isEditingService = false;
+            _serviceToEdit = null;
+          });
+        },
         isEditing: _isEditingService,
         serviceToEdit: _serviceToEdit,
       );
@@ -363,7 +367,7 @@ class _HomePageState extends ConsumerState<HomePage>
                         columns: const [
                           DataColumn(
                             label: Text(
-                              'Nombre',
+                              'Servicio',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -391,7 +395,64 @@ class _HomePageState extends ConsumerState<HomePage>
                             services.map((service) {
                               return DataRow(
                                 cells: [
-                                  DataCell(Text(service.name)),
+                                  DataCell(
+                                    FutureBuilder<String>(
+                                      future: ref
+                                          .read(storageProvider)
+                                          .getImagePath(
+                                            folder: 'services',
+                                            fileName: service.imagePath ?? '',
+                                          ),
+                                      builder: (context, snapshot) {
+                                        Widget imageWidget;
+
+                                        if (snapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          imageWidget = const SizedBox(
+                                            width: 40,
+                                            height: 40,
+                                          );
+                                        } else if (snapshot.hasError ||
+                                            !snapshot.hasData) {
+                                          imageWidget = const Icon(
+                                            Icons.broken_image,
+                                            size: 40,
+                                          );
+                                        } else {
+                                          imageWidget = Image.network(
+                                            snapshot.data!,
+                                            width: 40,
+                                            height: 40,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    const Icon(
+                                                      Icons.broken_image,
+                                                      size: 40,
+                                                    ),
+                                          );
+                                        }
+
+                                        return Row(
+                                          children: [
+                                            imageWidget,
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 180,
+                                              ),
+                                              child: Text(
+                                                service.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+
                                   DataCell(Text(service.description)),
                                   DataCell(Text(service.times)),
                                   DataCell(Text('\$${service.price}')),
@@ -409,16 +470,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                           onPressed: () {
                                             setState(() {
                                               _isEditingService = true;
-                                              _serviceToEdit = {
-                                                'id': service.id,
-                                                'name': service.name,
-                                                'description':
-                                                    service.description,
-                                                'price': service.price,
-                                                'imageUrl': service.imageUrl,
-                                                'duration': service.duration,
-                                                'times': service.times,
-                                              };
+                                              _serviceToEdit = service;
                                             });
                                           },
                                         ),

@@ -5,8 +5,8 @@ class Product {
   String name;
   String description;
   int price;
-  String? imageUrl; // para compatibilidad
-  String? imagePath; // nuevo
+  String? imageUrl;
+  String? imagePath;
   DateTime? createdAt;
   DateTime? deletedAt;
   String status;
