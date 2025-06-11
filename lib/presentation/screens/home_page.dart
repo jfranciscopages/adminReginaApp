@@ -5,11 +5,12 @@ import 'package:admin_regina_app/presentation/providers/product_provider.dart';
 import 'package:admin_regina_app/presentation/providers/purchase_order_provider.dart';
 import 'package:admin_regina_app/presentation/providers/service_provider.dart';
 import 'package:admin_regina_app/presentation/providers/storage_provider.dart';
+import 'package:admin_regina_app/presentation/providers/user_provider.dart';
 import 'package:admin_regina_app/presentation/screens/add_product_screen.dart';
 import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // ✅
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -29,6 +30,8 @@ class _HomePageState extends ConsumerState<HomePage>
   Service? _serviceToEdit;
   int _currentPage = 0;
   final int _rowsPerPage = 10;
+  bool _showOrderDetail = false;
+  PurchaseOrder? _selectedOrder;
 
   @override
   void initState() {
@@ -66,10 +69,32 @@ class _HomePageState extends ConsumerState<HomePage>
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
           ),
-          _buildSalesSection(),
+          _buildSalesSectionWrapper(),
         ],
       ),
     );
+  }
+
+  Widget _buildSalesSectionWrapper() {
+    if (_showOrderDetail && _selectedOrder != null) {
+      return Consumer(
+        builder: (context, ref, _) {
+          final asyncName = ref.watch(userNameProvider(_selectedOrder!.userId));
+
+          return asyncName.when(
+            data: (name) => _buildOrderDetailView(_selectedOrder!, name),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error:
+                (_, __) => _buildOrderDetailView(
+                  _selectedOrder!,
+                  'Cliente desconocido',
+                ),
+          );
+        },
+      );
+    } else {
+      return _buildSalesTable();
+    }
   }
 
   Widget _buildProductSection(List<Product> products) {
@@ -164,7 +189,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                           imageWidget = const SizedBox(
                                             width: 40,
                                             height: 40,
-                                          ); // o shimmer si querés
+                                          );
                                         } else if (snapshot.hasError ||
                                             !snapshot.hasData) {
                                           imageWidget = const Icon(
@@ -555,21 +580,13 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  Widget _buildSalesSection() {
-    final provider = PurchaseOrderProvider();
+  Widget _buildSalesTable() {
+    final ordersAsync = ref.watch(purchaseOrderStreamProvider);
 
-    return StreamBuilder<List<PurchaseOrder>>(
-      stream: provider.getOrdersStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No hay ventas registradas.'));
-        }
-
-        final orders = snapshot.data!;
+    return ordersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (orders) {
         orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         final paginatedOrders =
             orders
@@ -603,7 +620,7 @@ class _HomePageState extends ConsumerState<HomePage>
                               columns: const [
                                 DataColumn(
                                   label: Text(
-                                    'ID Orden',
+                                    'Cliente',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -646,7 +663,26 @@ class _HomePageState extends ConsumerState<HomePage>
                                   paginatedOrders.map((order) {
                                     return DataRow(
                                       cells: [
-                                        DataCell(Text(order.id)),
+                                        DataCell(
+                                          Consumer(
+                                            builder: (context, ref, _) {
+                                              final asyncName = ref.watch(
+                                                userNameProvider(order.userId),
+                                              );
+                                              return asyncName.when(
+                                                data: (name) => Text(name),
+                                                loading:
+                                                    () => const Text(
+                                                      'Cargando...',
+                                                    ),
+                                                error:
+                                                    (_, __) => const Text(
+                                                      'Desconocido',
+                                                    ),
+                                              );
+                                            },
+                                          ),
+                                        ),
                                         DataCell(Text(order.status)),
                                         DataCell(
                                           Text(
@@ -664,7 +700,10 @@ class _HomePageState extends ConsumerState<HomePage>
                                               Icons.info_outline,
                                             ),
                                             onPressed: () {
-                                              _showOrderDetailsDialog(order);
+                                              setState(() {
+                                                _selectedOrder = order;
+                                                _showOrderDetail = true;
+                                              });
                                             },
                                           ),
                                         ),
@@ -709,45 +748,99 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  void _showOrderDetailsDialog(PurchaseOrder order) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Detalle de Orden ${order.id}'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: order.items.length,
-                itemBuilder: (context, index) {
-                  final item = order.items[index];
-                  return ListTile(
-                    leading:
-                        item.product.imageUrl != null
-                            ? Image.network(
-                              item.product.imageUrl!,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                            )
-                            : const Icon(Icons.image_not_supported),
-                    title: Text(item.product.name),
-                    subtitle: Text('Cantidad: ${item.quantity}'),
-                    trailing: Text(
-                      '\$${item.product.price.toStringAsFixed(2)}',
+  Widget _buildOrderDetailView(PurchaseOrder order, String clientName) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      setState(() {
+                        _showOrderDetail = false;
+                        _selectedOrder = null;
+                      });
+                    },
+                  ),
+                  Text(
+                    clientName,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Estado: ${order.status}'),
+                  Text('Total: \$${order.totalPrice.toStringAsFixed(2)}'),
+                  Text(
+                    'Fecha: ${order.createdAt.toLocal().toString().split(' ').first}',
+                  ),
+                  const Divider(height: 24),
+                  const Text(
+                    'Productos:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: order.items.length,
+                    itemBuilder: (context, index) {
+                      final item = order.items[index];
+                      return ListTile(
+                        leading:
+                            item.product.imagePath != null
+                                ? FutureBuilder<String>(
+                                  future: ref
+                                      .read(storageProvider)
+                                      .getImagePath(
+                                        folder: 'products',
+                                        fileName: item.product.imagePath!,
+                                      ),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.connectionState ==
+                                        ConnectionState.waiting) {
+                                      return const SizedBox(
+                                        width: 40,
+                                        height: 40,
+                                      );
+                                    } else if (snapshot.hasError ||
+                                        !snapshot.hasData) {
+                                      return const Icon(
+                                        Icons.image_not_supported,
+                                      );
+                                    } else {
+                                      return Image.network(
+                                        snapshot.data!,
+                                        width: 40,
+                                        height: 40,
+                                        fit: BoxFit.cover,
+                                      );
+                                    }
+                                  },
+                                )
+                                : const Icon(Icons.image_not_supported),
+                        title: Text(item.product.name),
+                        subtitle: Text('Cantidad: ${item.quantity}'),
+                        trailing: Text(
+                          '\$${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cerrar'),
-              ),
-            ],
           ),
+        );
+      },
     );
   }
 }
