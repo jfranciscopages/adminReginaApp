@@ -13,3 +13,19 @@ final serviceProvider = StreamProvider<List<Service>>((ref) {
       .snapshots()
       .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
 });
+
+final serviceNameProvider = FutureProvider.family<String, String>((
+  ref,
+  serviceId,
+) async {
+  final doc =
+      await FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId)
+          .get();
+
+  if (!doc.exists) throw Exception('Servicio no encontrado');
+
+  final service = Service.fromFirestore(doc, null);
+  return service.name;
+});
