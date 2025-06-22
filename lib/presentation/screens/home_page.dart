@@ -1,6 +1,7 @@
 import 'package:admin_regina_app/domain/order.dart';
 import 'package:admin_regina_app/domain/product.dart';
 import 'package:admin_regina_app/domain/service.dart';
+import 'package:admin_regina_app/presentation/providers/appointment_provider.dart';
 import 'package:admin_regina_app/presentation/providers/product_provider.dart';
 import 'package:admin_regina_app/presentation/providers/purchase_order_provider.dart';
 import 'package:admin_regina_app/presentation/providers/service_provider.dart';
@@ -36,7 +37,7 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -53,6 +54,7 @@ class _HomePageState extends ConsumerState<HomePage>
             Tab(text: 'Productos'),
             Tab(text: 'Servicios'),
             Tab(text: 'Mis ventas'),
+            Tab(text: 'Mis turnos'),
           ],
         ),
       ),
@@ -70,8 +72,260 @@ class _HomePageState extends ConsumerState<HomePage>
             error: (e, _) => Center(child: Text('Error: $e')),
           ),
           _buildSalesSectionWrapper(),
+          _buildAppointmentsSection(),
         ],
       ),
+    );
+  }
+
+  Future<void> updateAppointmentStatus({
+    required String appointmentId,
+    required String newStatus,
+  }) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('appointments')
+          .doc(appointmentId)
+          .update({
+            'status': newStatus,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      throw Exception('Error al actualizar el estado del turno: $e');
+    }
+  }
+
+  Widget _buildAppointmentsSection() {
+    final appointmentsAsync = ref.watch(appointmentProvider);
+    const rowsPerPage = 10;
+
+    return appointmentsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (appointments) {
+        appointments.sort((a, b) => b.date.compareTo(a.date));
+        final totalPages = (appointments.length / rowsPerPage).ceil();
+        final currentPageAppointments =
+            appointments
+                .skip(_currentPage * rowsPerPage)
+                .take(rowsPerPage)
+                .toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 60),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.vertical,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 1000),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columnSpacing: 24,
+                              dataRowMinHeight: 56,
+                              dataRowMaxHeight: 72,
+                              columns: const [
+                                DataColumn(
+                                  label: Text(
+                                    'Cliente',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Servicio',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Fecha',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Estado',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              rows:
+                                  currentPageAppointments.map((appointment) {
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(
+                                          Consumer(
+                                            builder: (context, ref, _) {
+                                              final asyncName = ref.watch(
+                                                userNameProvider(
+                                                  appointment.userId,
+                                                ),
+                                              );
+                                              return asyncName.when(
+                                                data: (name) => Text(name),
+                                                loading:
+                                                    () => const Text(
+                                                      'Cargando...',
+                                                    ),
+                                                error:
+                                                    (_, __) => const Text(
+                                                      'Desconocido',
+                                                    ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Consumer(
+                                            builder: (context, ref, _) {
+                                              final asyncServiceName = ref
+                                                  .watch(
+                                                    serviceNameProvider(
+                                                      appointment.serviceId,
+                                                    ),
+                                                  );
+                                              return asyncServiceName.when(
+                                                data: (name) => Text(name),
+                                                loading:
+                                                    () => const Text(
+                                                      'Cargando...',
+                                                    ),
+                                                error:
+                                                    (_, __) => const Text(
+                                                      'Desconocido',
+                                                    ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            '${appointment.date.day.toString().padLeft(2, '0')}/${appointment.date.month.toString().padLeft(2, '0')}/${appointment.date.year}',
+                                          ),
+                                        ),
+                                        DataCell(
+                                          DropdownButton<String>(
+                                            value: appointment.status,
+                                            items: const [
+                                              DropdownMenuItem(
+                                                value: 'activo',
+                                                child: Text('Activo'),
+                                              ),
+                                              DropdownMenuItem(
+                                                value: 'completado',
+                                                child: Text('Completado'),
+                                              ),
+                                              DropdownMenuItem(
+                                                value: 'cancelado',
+                                                child: Text('Cancelado'),
+                                              ),
+                                            ],
+                                            onChanged: (newValue) async {
+                                              if (newValue != null &&
+                                                  newValue !=
+                                                      appointment.status) {
+                                                try {
+                                                  await updateAppointmentStatus(
+                                                    appointmentId:
+                                                        appointment.id,
+                                                    newStatus: newValue,
+                                                  );
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Estado actualizado a "$newValue"',
+                                                      ),
+                                                      backgroundColor:
+                                                          Theme.of(context)
+                                                              .colorScheme
+                                                              .primaryContainer,
+                                                      behavior:
+                                                          SnackBarBehavior
+                                                              .floating,
+                                                      duration: const Duration(
+                                                        seconds: 2,
+                                                      ),
+                                                    ),
+                                                  );
+                                                } catch (e) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Error al actualizar estado: $e',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.red,
+                                                      behavior:
+                                                          SnackBarBehavior
+                                                              .floating,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    onPressed:
+                        _currentPage > 0
+                            ? () => setState(() => _currentPage--)
+                            : null,
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                  Text('Página ${_currentPage + 1} de $totalPages'),
+                  IconButton(
+                    onPressed:
+                        (_currentPage + 1) * rowsPerPage < appointments.length
+                            ? () => setState(() => _currentPage++)
+                            : null,
+                    icon: const Icon(Icons.arrow_forward),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
