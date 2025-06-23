@@ -161,6 +161,14 @@ class _HomePageState extends ConsumerState<HomePage>
                                 ),
                                 DataColumn(
                                   label: Text(
+                                    'Hora',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
                                     'Estado',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -222,6 +230,12 @@ class _HomePageState extends ConsumerState<HomePage>
                                             '${appointment.date.day.toString().padLeft(2, '0')}/${appointment.date.month.toString().padLeft(2, '0')}/${appointment.date.year}',
                                           ),
                                         ),
+                                        DataCell(
+                                          Text(
+                                            '${appointment.date.hour.toString().padLeft(2, '0')}:${appointment.date.minute.toString().padLeft(2, '0')}',
+                                          ),
+                                        ),
+
                                         DataCell(
                                           DropdownButton<String>(
                                             value: appointment.status,
