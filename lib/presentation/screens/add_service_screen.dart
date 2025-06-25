@@ -160,19 +160,24 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
+
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(
                           labelText: 'Nombre del servicio',
+                          border: OutlineInputBorder(),
                         ),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
+                      const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _descriptionController,
                         decoration: const InputDecoration(
                           labelText: 'Descripción del servicio',
+                          border: OutlineInputBorder(),
                           alignLabelWithHint: true,
                         ),
                         maxLines: null,
@@ -182,10 +187,13 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
+                      const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _durationController,
                         decoration: const InputDecoration(
                           labelText: 'Duración (en minutos)',
+                          border: OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.number,
                         validator: (val) {
@@ -197,10 +205,13 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _priceController,
                         decoration: const InputDecoration(
                           labelText: 'Precio del servicio',
+                          border: OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.number,
                         validator: (val) {
@@ -210,6 +221,8 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 24),
+
                       ImageUploader(
                         itemId:
                             widget.serviceToEdit?.id ??
@@ -222,8 +235,8 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                           });
                         },
                       ),
+                      const SizedBox(height: 32),
 
-                      const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
