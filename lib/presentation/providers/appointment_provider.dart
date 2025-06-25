@@ -5,7 +5,6 @@ import 'package:admin_regina_app/domain/appointment.dart';
 final appointmentProvider = StreamProvider<List<Appointment>>((ref) {
   return FirebaseFirestore.instance
       .collection('appointments')
-      .where('deletedAt', isNull: true)
       .withConverter<Appointment>(
         fromFirestore: Appointment.fromFirestore,
         toFirestore: (appointment, _) => appointment.toFirestore(),

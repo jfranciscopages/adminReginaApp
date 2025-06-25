@@ -12,6 +12,7 @@ import 'package:admin_regina_app/presentation/screens/add_service_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -48,6 +49,7 @@ class _HomePageState extends ConsumerState<HomePage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Regina App'),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -92,6 +94,23 @@ class _HomePageState extends ConsumerState<HomePage>
           });
     } catch (e) {
       throw Exception('Error al actualizar el estado del turno: $e');
+    }
+  }
+
+  Future<void> updateOrderStatus({
+    required String orderId,
+    required String newStatus,
+  }) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('purchaseOrders')
+          .doc(orderId)
+          .update({
+            'status': newStatus,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      throw Exception('Error al actualizar el estado de la orden: $e');
     }
   }
 
@@ -161,6 +180,14 @@ class _HomePageState extends ConsumerState<HomePage>
                                 ),
                                 DataColumn(
                                   label: Text(
+                                    'Hora',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
                                     'Estado',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
@@ -222,6 +249,12 @@ class _HomePageState extends ConsumerState<HomePage>
                                             '${appointment.date.day.toString().padLeft(2, '0')}/${appointment.date.month.toString().padLeft(2, '0')}/${appointment.date.year}',
                                           ),
                                         ),
+                                        DataCell(
+                                          Text(
+                                            '${appointment.date.hour.toString().padLeft(2, '0')}:${appointment.date.minute.toString().padLeft(2, '0')}',
+                                          ),
+                                        ),
+
                                         DataCell(
                                           DropdownButton<String>(
                                             value: appointment.status,
@@ -851,7 +884,7 @@ class _HomePageState extends ConsumerState<HomePage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 60),
+            const SizedBox(height: 32),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -915,6 +948,10 @@ class _HomePageState extends ConsumerState<HomePage>
                               ],
                               rows:
                                   paginatedOrders.map((order) {
+                                    final formattedDate = DateFormat(
+                                      'dd/MM/yyyy – HH:mm',
+                                    ).format(order.createdAt);
+
                                     return DataRow(
                                       cells: [
                                         DataCell(
@@ -924,10 +961,28 @@ class _HomePageState extends ConsumerState<HomePage>
                                                 userNameProvider(order.userId),
                                               );
                                               return asyncName.when(
-                                                data: (name) => Text(name),
+                                                data:
+                                                    (name) => Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 4.0,
+                                                          ),
+                                                      child: Text(
+                                                        name,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ),
                                                 loading:
-                                                    () => const Text(
-                                                      'Cargando...',
+                                                    () => const SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
                                                     ),
                                                 error:
                                                     (_, __) => const Text(
@@ -937,28 +992,90 @@ class _HomePageState extends ConsumerState<HomePage>
                                             },
                                           ),
                                         ),
-                                        DataCell(Text(order.status)),
+                                        DataCell(
+                                          DropdownButton<String>(
+                                            value: order.status,
+                                            items: const [
+                                              DropdownMenuItem(
+                                                value: 'Pendiente',
+                                                child: Text('Pendiente'),
+                                              ),
+                                              DropdownMenuItem(
+                                                value: 'Entregado',
+                                                child: Text('Entregado'),
+                                              ),
+                                            ],
+                                            onChanged: (newValue) async {
+                                              if (newValue != null &&
+                                                  newValue != order.status) {
+                                                try {
+                                                  await updateOrderStatus(
+                                                    orderId: order.id,
+                                                    newStatus: newValue,
+                                                  );
+
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Estado actualizado a "$newValue"',
+                                                      ),
+                                                      backgroundColor:
+                                                          Theme.of(context)
+                                                              .colorScheme
+                                                              .primaryContainer,
+                                                      behavior:
+                                                          SnackBarBehavior
+                                                              .floating,
+                                                      duration: const Duration(
+                                                        seconds: 2,
+                                                      ),
+                                                    ),
+                                                  );
+                                                } catch (e) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        'Error al actualizar estado: $e',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.red,
+                                                      behavior:
+                                                          SnackBarBehavior
+                                                              .floating,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          ),
+                                        ),
                                         DataCell(
                                           Text(
                                             '\$${order.totalPrice.toStringAsFixed(2)}',
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            '${order.createdAt.day.toString().padLeft(2, '0')}/${order.createdAt.month.toString().padLeft(2, '0')}/${order.createdAt.year}',
-                                          ),
-                                        ),
-                                        DataCell(
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.info_outline,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
                                             ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _selectedOrder = order;
-                                                _showOrderDetail = true;
-                                              });
-                                            },
+                                          ),
+                                        ),
+                                        DataCell(Text(formattedDate)),
+                                        DataCell(
+                                          Tooltip(
+                                            message: 'Ver detalle',
+                                            child: IconButton(
+                                              icon: const Icon(
+                                                Icons.open_in_new,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _selectedOrder = order;
+                                                  _showOrderDetail = true;
+                                                });
+                                              },
+                                            ),
                                           ),
                                         ),
                                       ],

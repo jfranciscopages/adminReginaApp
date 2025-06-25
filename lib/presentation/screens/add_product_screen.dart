@@ -140,19 +140,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 24),
+
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(
                           labelText: 'Nombre del producto',
+                          border: OutlineInputBorder(),
                         ),
                         validator:
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
+                      const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _descriptionController,
                         decoration: const InputDecoration(
                           labelText: 'Descripción del producto',
+                          border: OutlineInputBorder(),
                           alignLabelWithHint: true,
                         ),
                         maxLines: null,
@@ -162,10 +167,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             (val) =>
                                 val == null || val.isEmpty ? 'Requerido' : null,
                       ),
+                      const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _priceController,
                         decoration: const InputDecoration(
                           labelText: 'Precio del producto',
+                          border: OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.number,
                         validator: (val) {
@@ -175,6 +183,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 24),
+
                       ImageUploader(
                         itemId:
                             widget.productToEdit?.id ??
@@ -187,7 +197,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           });
                         },
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
